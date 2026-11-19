@@ -1,7 +1,7 @@
 // ZipRotas · Painel da loja - servidor sem dependências (Node 18+)
-// Login da loja:    http://localhost:3000/login.html
+// Login da loja:    http://localhost:3000/login
 // Painel da loja:   http://localhost:3000/
-// App do motoboy:   http://localhost:3000/motoboy.html?loja=CODIGO
+// API de posição (para o futuro app do motoboy): POST /api/location
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +13,7 @@ const OFFLINE_AFTER_MS = 30_000;
 const SESSION_DAYS = 7;
 const DATA_DIR = path.join(__dirname, 'data');
 const RESTAURANTS_FILE = path.join(DATA_DIR, 'restaurants.json');
-const PUBLIC = path.join(__dirname, 'public');
+const PUBLIC = path.join(__dirname, 'dist');
 
 // ---------- Contas de restaurante ----------
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -29,23 +29,31 @@ function newCode() {
   return Array.from(crypto.randomBytes(6), (b) => chars[b % chars.length]).join('');
 }
 
+// Contas mockadas criadas na primeira execução (veja README.md).
+// A senha do admin vem do arquivo .env (ADMIN_PASSWORD), que não vai para o git.
+try { process.loadEnvFile(path.join(__dirname, '.env')); } catch { /* sem .env */ }
+const SEED_ACCOUNTS = [
+  process.env.ADMIN_PASSWORD && { id: 'r-admin', name: 'ZipRotas Admin', email: process.env.ADMIN_EMAIL || 'admin@ziprotas.com', password: process.env.ADMIN_PASSWORD, code: 'ADMIN1', role: 'admin', demo: true },
+  { id: 'r-demo', name: 'Restaurante Demo', email: 'loja@demo.test', password: 'zip-demo-4821', code: 'DEMO42', role: 'loja', demo: true },
+].filter(Boolean);
+const DEFAULT_LOCATION = { lat: -23.5614, lng: -46.6826 }; // Pinheiros, São Paulo
+
 let restaurants = [];
 function loadRestaurants() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (fs.existsSync(RESTAURANTS_FILE)) {
-    restaurants = JSON.parse(fs.readFileSync(RESTAURANTS_FILE, 'utf8'));
-    return;
+  if (fs.existsSync(RESTAURANTS_FILE)) restaurants = JSON.parse(fs.readFileSync(RESTAURANTS_FILE, 'utf8'));
+  let changed = false;
+  for (const s of SEED_ACCOUNTS) {
+    if (restaurants.some((r) => r.email === s.email)) continue;
+    const { password, ...rest } = s;
+    restaurants.push({ ...rest, passwordHash: hashPassword(password), ...DEFAULT_LOCATION, createdAt: Date.now() });
+    changed = true;
   }
-  // Conta de demonstração (credenciais no README.md)
-  restaurants = [{
-    id: 'r-demo', name: 'Restaurante Demo', email: 'loja@demo.test',
-    passwordHash: hashPassword('zip-demo-4821'), code: 'DEMO42',
-    lat: -23.5614, lng: -46.6826, demo: true,
-  }];
-  saveRestaurants();
+  if (changed) saveRestaurants();
 }
 function saveRestaurants() { fs.writeFileSync(RESTAURANTS_FILE, JSON.stringify(restaurants, null, 2)); }
-const publicRestaurant = (r) => ({ id: r.id, name: r.name, email: r.email, code: r.code, lat: r.lat, lng: r.lng });
+const publicRestaurant = (r) => ({ id: r.id, name: r.name, email: r.email, code: r.code, lat: r.lat, lng: r.lng, role: r.role || 'loja' });
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const byCode = (code) => restaurants.find((r) => r.code === String(code || '').trim().toUpperCase());
 
 // ---------- Sessões (cookie HttpOnly) ----------
@@ -141,13 +149,16 @@ function send(res, code, obj, headers = {}) {
 }
 function redirect(res, to) { res.writeHead(302, { Location: to }); res.end(); }
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
 const VALID_STATUS = new Set(['disponivel', 'entrega', 'pausa']);
 
-function serveFile(res, file) {
+function serveFile(res, file, immutable = false) {
   fs.readFile(file, (err, data) => {
     if (err) return send(res, 404, { error: 'não encontrado' });
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
+      'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+    });
     res.end(data);
   });
 }
@@ -169,6 +180,33 @@ const server = http.createServer(async (req, res) => {
       }
       const token = createSession(r.id);
       return send(res, 200, { ok: true }, { 'Set-Cookie': cookie(token, SESSION_DAYS * 86400) });
+    }
+    if (p === '/api/register' && req.method === 'POST') {
+      const ip = req.socket.remoteAddress;
+      if (tooManyAttempts(ip)) return send(res, 429, { error: 'Muitas tentativas. Espere 1 minuto.' });
+      const b = await readJson(req);
+      const name = String(b.name || '').trim().slice(0, 60);
+      const email = String(b.email || '').trim().toLowerCase();
+      const password = String(b.password || '');
+      if (name.length < 2) return send(res, 400, { error: 'Digite o nome do restaurante.' });
+      if (!EMAIL_RE.test(email)) return send(res, 400, { error: 'E-mail inválido.' });
+      if (password.length < 8) return send(res, 400, { error: 'A senha precisa ter pelo menos 8 caracteres.' });
+      if (restaurants.some((r) => r.email.toLowerCase() === email)) {
+        failAttempt(ip);
+        return send(res, 409, { error: 'Já existe uma loja com este e-mail.' });
+      }
+      const lat = Number(b.lat), lng = Number(b.lng);
+      const hasLoc = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+      let code;
+      do { code = newCode(); } while (byCode(code));
+      const r = {
+        id: 'r-' + crypto.randomBytes(6).toString('hex'), name, email, passwordHash: hashPassword(password), code,
+        role: 'loja', ...(hasLoc ? { lat, lng } : DEFAULT_LOCATION), createdAt: Date.now(),
+      };
+      restaurants.push(r);
+      saveRestaurants();
+      const token = createSession(r.id);
+      return send(res, 201, { ok: true }, { 'Set-Cookie': cookie(token, SESSION_DAYS * 86400) });
     }
     if (p === '/api/logout' && req.method === 'POST') {
       if (session) sessions.delete(session.token);
@@ -230,18 +268,23 @@ const server = http.createServer(async (req, res) => {
       return send(res, 404, { error: 'não encontrado' });
     }
 
-    // --- páginas ---
-    if (p === '/' || p === '/index.html') {
-      if (!session) return redirect(res, '/login.html');
-      return serveFile(res, path.join(PUBLIC, 'index.html'));
-    }
-    if (p === '/login' || p === '/login.html') {
-      if (session) return redirect(res, '/');
-      return serveFile(res, path.join(PUBLIC, 'login.html'));
-    }
+    // --- páginas (app Vue em dist/) ---
+    // links antigos
+    if (p === '/login.html') return redirect(res, '/login');
+    if (p === '/index.html') return redirect(res, '/');
+
     const file = path.normalize(path.join(PUBLIC, p));
-    if (!file.startsWith(PUBLIC + path.sep)) return send(res, 403, { error: 'proibido' });
-    return serveFile(res, file);
+    if (!file.startsWith(PUBLIC + path.sep) && file !== PUBLIC) return send(res, 403, { error: 'proibido' });
+    fs.stat(file, (err, st) => {
+      if (!err && st.isFile()) return serveFile(res, file, p.startsWith('/assets/'));
+      // rotas do Vue Router (/, /login) → index.html
+      const index = path.join(PUBLIC, 'index.html');
+      if (!fs.existsSync(index)) {
+        res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('Front-end não compilado. Rode "npm run build" (ou "npm run dev" e abra http://localhost:5173).');
+      }
+      return serveFile(res, index);
+    });
   } catch (e) {
     send(res, 500, { error: e.message });
   }
@@ -293,8 +336,7 @@ function startSimulator(R) {
 
 loadRestaurants();
 server.listen(PORT, () => {
-  console.log(`Login da loja:   http://localhost:${PORT}/login.html`);
-  console.log(`App do motoboy:  http://localhost:${PORT}/motoboy.html`);
-  const demo = restaurants.find((r) => r.demo);
-  if (SIMULATE && demo) { startSimulator(demo); console.log('Simulador ligado na loja demo. Use SIMULATE=0 para desligar.'); }
+  console.log(`Painel da loja:  http://localhost:${PORT}/`);
+  const demos = restaurants.filter((r) => r.demo);
+  if (SIMULATE && demos.length) { demos.forEach(startSimulator); console.log('Simulador ligado nas contas demo/admin. Use SIMULATE=0 para desligar.'); }
 });

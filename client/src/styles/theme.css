@@ -1,0 +1,45 @@
+/* Tema ZipRotas */
+:root {
+  --page: #1e1e1e; --panel: #1d1d1d; --card: #18181b; --card-hover: #202024; --field: #202024; --line: #2e2e33;
+  --text: #d6d6da; --title: #fafafa; --muted: #8a8a92;
+  --red: #ea1d2c; --red-press: #c8101e; --red-deep: #7a141b; --red-soft: #ea1d2c1f; --red-text: #ff5a66;
+  --green: #0a9c50; --green-lt: #2fca78; --green-soft: #0a9c5024;
+  --amber: #f5a524; --amber-soft: #f5a52422; --gray: #6b6b72;
+  --radius: 12px; --tracking: -0.04em;
+  --font: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--page); color: var(--text); font-family: var(--font); font-weight: 500; -webkit-font-smoothing: antialiased; }
+#app { height: 100%; }
+button { font: inherit; }
+input { font: inherit; }
+
+.logo { width: 32px; height: 32px; border-radius: 10px; background: var(--red); display: grid; place-items: center; flex: none; }
+.logo svg { width: 19px; height: 19px; }
+
+.btn { border: 0; border-radius: var(--radius); font-weight: 700; cursor: pointer; transition: background .2s, border-color .2s, color .2s, transform .1s; }
+.btn:active { transform: scale(.98); }
+.btn-red { background: var(--red); color: #fff; }
+.btn-red:hover { background: var(--red-press); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.btn-ghost:hover { color: var(--title); border-color: #4a4a52; }
+.btn:disabled { opacity: .6; cursor: wait; }
+
+.input { width: 100%; padding: 13px 14px; font-size: 15px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--field); color: var(--title); outline: none; transition: border-color .2s, box-shadow .2s; }
+.input:focus { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+.input::placeholder { color: #5c5c64; }
+.label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; }
+
+.badge { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 999px; white-space: nowrap; }
+.b-disponivel { background: var(--green-soft); color: var(--green-lt); }
+.b-entrega { background: var(--red-soft); color: var(--red-text); }
+.b-pausa { background: var(--amber-soft); color: var(--amber); }
+.b-offline { background: #6b6b7224; color: #9a9aa2; }
+
+.err-box { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--red-soft); color: var(--red-text); font-size: 13px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
