@@ -5,6 +5,13 @@ async function request(method, url, body) {
     body: body ? JSON.stringify(body) : undefined,
     credentials: 'same-origin',
   });
+  // Se a resposta não for JSON, a API não está rodando nesse endereço
+  // (ex.: hospedagem só do front devolvendo o index.html). Nunca tratar como sucesso.
+  if (!(res.headers.get('content-type') || '').includes('application/json')) {
+    const err = new Error('Servidor indisponível no momento. Tente de novo em instantes.');
+    err.status = 503;
+    throw err;
+  }
   let data = {};
   try { data = await res.json(); } catch { /* sem corpo */ }
   if (!res.ok) {
@@ -15,7 +22,12 @@ async function request(method, url, body) {
   return data;
 }
 
-export const api = {
+import { demoApi } from './demoBackend.js';
+
+// Build de demonstração (npm run build:demo): tudo roda no navegador, sem servidor.
+export const IS_DEMO = import.meta.env.VITE_DEMO === '1';
+
+const realApi = {
   me: () => request('GET', '/api/me'),
   login: (email, password) => request('POST', '/api/login', { email, password }),
   register: (data) => request('POST', '/api/register', data),
@@ -25,6 +37,8 @@ export const api = {
   loja: (codigo) => request('GET', `/api/loja?codigo=${encodeURIComponent(codigo)}`),
   sendLocation: (payload) => request('POST', '/api/location', payload),
 };
+
+export const api = IS_DEMO ? demoApi : realApi;
 
 export const STATUS = {
   disponivel: { label: 'Disponível', color: '#0a9c50' },

@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createMemoryHistory, createRouter, createWebHistory } from 'vue-router';
 import { api } from './lib/api.js';
 
 const routes = [
@@ -8,7 +8,9 @@ const routes = [
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ];
 
-const router = createRouter({ history: createWebHistory(), routes });
+// No artefato (modo demo) a URL não pode mudar, então a navegação fica só na memória.
+const history = import.meta.env.VITE_DEMO === '1' ? createMemoryHistory() : createWebHistory();
+const router = createRouter({ history, routes });
 
 router.beforeEach(async (to) => {
   if (!to.meta.auth && !to.meta.guest) return true;

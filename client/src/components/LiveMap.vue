@@ -7,7 +7,8 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { animate } from 'animejs';
-import { STATUS, effStatus, initials } from '../lib/api.js';
+import { STATUS, effStatus, initials, IS_DEMO } from '../lib/api.js';
+import { demoCityLayer } from '../lib/demoMapLayer.js';
 import { reducedMotion } from '../lib/motion.js';
 
 const props = defineProps({
@@ -106,7 +107,8 @@ function sync() {
 
 onMounted(() => {
   map = L.map(el.value, { zoomControl: true, attributionControl: true }).setView([-23.5614, -46.6826], 14);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
+  if (IS_DEMO) demoCityLayer().addTo(map);
+  else L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
   map.on('dragstart', () => emit('stop-follow'));
   sync();
 });

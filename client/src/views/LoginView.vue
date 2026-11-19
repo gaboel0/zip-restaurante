@@ -15,6 +15,7 @@
         <form class="card" ref="card" novalidate @submit.prevent="submit">
           <h1 ref="title" :key="mode">{{ isRegister ? 'Criar conta da loja' : 'Entrar no painel da loja' }}</h1>
           <p class="sub a-in">{{ isRegister ? 'Leva menos de um minuto.' : 'Use o e-mail e a senha do restaurante.' }}</p>
+          <p v-if="IS_DEMO && !isRegister" class="demo-hint a-in">Versão de demonstração: os dados já estão preenchidos, é só clicar em Entrar.</p>
 
           <div v-if="isRegister" class="a-in">
             <label class="label" for="name">Nome do restaurante</label>
@@ -75,7 +76,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { animate, stagger, splitText } from 'animejs';
 import CityScene from '../components/CityScene.vue';
 import BrandLogo from '../components/BrandLogo.vue';
-import { api } from '../lib/api.js';
+import { api, IS_DEMO } from '../lib/api.js';
 import { reducedMotion } from '../lib/motion.js';
 
 const route = useRoute();
@@ -84,8 +85,8 @@ const mode = computed(() => (route.name === 'cadastro' ? 'cadastro' : 'login'));
 const isRegister = computed(() => mode.value === 'cadastro');
 
 const name = ref('');
-const email = ref('');
-const password = ref('');
+const email = ref(IS_DEMO ? 'loja@demo.test' : '');
+const password = ref(IS_DEMO ? 'demonstracao' : '');
 const password2 = ref('');
 const show = ref(false);
 const loading = ref(false);
@@ -186,6 +187,7 @@ async function fail(msg) {
 h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; color: var(--title); margin: 0 0 4px; }
 h1 :deep(span) { display: inline-block; }
 .sub { color: var(--muted); font-size: 13px; margin: 0 0 6px; }
+.demo-hint { margin: 10px 0 2px; padding: 9px 11px; border-radius: 10px; background: var(--green-soft); color: var(--green-lt); font-size: 12px; font-weight: 600; }
 .field { position: relative; }
 .toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: 0; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; padding: 8px; border-radius: 8px; }
 .toggle:hover { color: var(--title); }

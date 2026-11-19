@@ -17,6 +17,21 @@ npm start       # produção: serve dist/ + API em http://localhost:3000
 
 `npm start` liga 5 motoboys simulados na loja demo. `npm run start:real` desliga a simulação.
 
+### Demonstração sem servidor (artefato)
+
+```
+npm run artifact   # gera artifact/zip-restaurante-demo.html (um único arquivo)
+```
+
+Build em modo `demo`: login, motoboys e mapa rodam no navegador (`client/src/lib/demoBackend.js`
+e `demoMapLayer.js`), sem chamadas de rede. Qualquer e-mail e senha entram. Esse código não entra
+no build normal (`npm run build`).
+
+### Hospedagem
+
+O `server.js` precisa ficar rodando (login, sessões, tempo real). Hospedar só o `dist/` (ex.: Vercel
+sem backend) deixa o app sem API: o front mostra "Servidor indisponível" e não abre o painel.
+
 ## Contas mockadas
 
 Criadas automaticamente na primeira execução (definidas em `SEED_ACCOUNTS`, no `server.js`).
