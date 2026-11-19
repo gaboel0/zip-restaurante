@@ -1,0 +1,11 @@
+{
+  "name": "motoboy-tracker",
+  "version": "1.0.0",
+  "description": "Painel em tempo real para o dono do restaurante ver onde cada motoboy está",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:real": "node -e \"process.env.SIMULATE='0';require('./server.js')\""
+  },
+  "engines": { "node": ">=18" }
+}
